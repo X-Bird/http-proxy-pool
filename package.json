@@ -1,0 +1,19 @@
+{
+  "name": "http-proxy-pool",
+  "version": "0.1.0",
+  "description": "maintain a proxy ip pool using express and request",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "^3.5.0",
+    "es6-promise-pool": "^2.4.4",
+    "express": "^4.15.2",
+    "iconv-lite": "^0.4.16",
+    "lodash": "^4.17.4",
+    "request": "^2.81.0"
+  }
+}
