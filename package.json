@@ -4,7 +4,7 @@
   "description": "maintain a proxy ip pool using express and request",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha"
   },
   "author": "",
   "license": "ISC",
@@ -14,6 +14,8 @@
     "express": "^4.15.2",
     "iconv-lite": "^0.4.16",
     "lodash": "^4.17.4",
+    "mocha": "^3.4.2",
+    "mongodb": "^2.2.28",
     "request": "^2.81.0"
   }
 }

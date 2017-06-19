@@ -1,0 +1,12 @@
+let prod = false;
+
+if (typeof process.env.IS_PRODUCTION !== 'undefined') {
+    prod = process.env.IS_PRODUCTION;
+}
+
+var CFG = {
+    // 代理IP 的通信网址
+    httpdaili_dot_com: ''
+}
+
+module.exports = CFG;

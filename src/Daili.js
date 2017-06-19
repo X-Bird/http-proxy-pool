@@ -1,8 +1,10 @@
-let PromisePool = require('es6-promise-pool');
-let Bluebird = require('bluebird');
-let request = require('request');
-let _ = require('lodash');
-let Iconv = require('iconv-lite');
+const PromisePool = require('es6-promise-pool');
+const Bluebird = require('bluebird');
+const request = require('request');
+const _ = require('lodash');
+const Iconv = require('iconv-lite');
+
+const ping = require('./ValidateProxy');
 
 
 // todo: 本地存储一些已经拿下来的ip地址
@@ -11,19 +13,19 @@ class Daili {
 
     constructor(options) {
 
+        this.checking = false;
+        this.lastCheck = new Date() - 1000 * 60 * 30;
         this.poolMayBad = [];
         this.pool = [];
-        // this.doingCount = 0;
-        // this.threshold = 5;
+
+        this._adapters = options.adapters;
+
+
         this.poolSize = options.poolSize || 10;
 
         this.getNewProxyCount = options.getNewProxyCount || 10;
         this.api = options.api;
 
-        // this.DOING_FLAG = false;
-
-        // this.randomDelayMin = options.randomDelayMin || 5000;
-        // this.randomDelayMax = options.randomDelayMax || 10000;
         this.pingTarget = options.pingTarget || 'http://baidu.com';
         this.maintainConcurrency = options.maintainConcurrency || 10;
         this.getProxyListTimeout = options.getProxyListTimeout || 30000;
@@ -41,20 +43,24 @@ class Daili {
 
         while (true) {
 
+            if (new Data() - this.lastCheck > 1000 * 60 * 30 && !this.checking) {
+                // todo: get all proxy needed to check , put into a queue
+                // todo: checking = true
+                // todo: do async check
+                // todo: after checked , set checking = false, this.lastCheck = new Date();
+            }
+
             if (this.pool.length >= this.poolSize) {
-                await Bluebird.delay(5000);
+                await Bluebird.delay(1000);
                 continue;
             }
 
-
-            // if (this.poolMayBad.length < CFG.IP_POOL_MAY_BAD_SIZE && this.doingCount <= this.threshold) {
-            // console.log('go on');
-            // this.doingCount++;
-
             await new Bluebird(async function (resolve, reject) {
+
                 try {
 
-                    let  result = await this.getNewProxy(this.getNewProxyCount, this.getProxyListTimeout);
+                    // todo: make many adapter to get different website's proxies
+                    let result = await this.getNewProxy(this.getNewProxyCount, this.getProxyListTimeout);
 
                     // console.log(result);
 
@@ -93,37 +99,6 @@ class Daili {
         throw new Error('NO_PROXY');
     }
 
-    ping(webUrl, proxyAddress, timeout) {
-
-        return new Bluebird(function (resolve, reject) {
-
-            var startTime = new Date();
-            request({
-                url: webUrl,
-                proxy: 'http://' + proxyAddress,
-                timeout: timeout
-            }, function (err, resp, body) {
-
-                // console.log(6);
-
-                var endTime = new Date();
-                var goodResult = {
-                    isGood: true,
-                    ip: proxyAddress,
-                    ms: endTime.getTime() - startTime.getTime(),
-                    badCount: 0
-                };
-
-                if (err) return reject(new Error('VALID_PROXY_ERROR'));
-                // console.log('验证成功一个');
-                if (resp.statusCode == 200) return resolve(goodResult);
-
-                return reject(new Error('VALID_PROXY_FAILED'));
-
-            }.bind(this));
-        })
-    }
-
     // 这个 promise pool 有点问题
     // 已知问题
     // 1. 当producer是async函数的时候，await pool.start() 永远不会停止，因为 async 函数里面即使return null，也是一个promise，不是null？（猜测，待验证）
@@ -132,24 +107,21 @@ class Daili {
         // console.log('验证之前的条件判断');
         // console.log(this.poolMayBad.length, this.pool.length, CFG.IP_POOL_SIZE);
 
-        if (this.poolMayBad.length === 0 || this.pool.length > this.poolSize)
+        if (this.poolMayBad.length === 0)
             return null;
 
-        return new Bluebird(async function (resolve, reject) {
-            // console.log(10);
-            // console.log('这里其实应该就是得开始进行验证了');
-
-
+        return new Bluebird(async (resolve, reject) => {
 
             try {
                 // await Bluebird.delay(_.random(CFG.IP_PROXY_GETTING_RANDOM_DELAY_MIN_MS, CFG.IP_PROXY_GETTING_RANDOM_DELAY_MAX_MS));
-                
-                let ip = this.poolMayBad.shift();;
-                // console.log(11);
-                let goodIp = await this.ping(this.pingTarget, ip, this.validateProxyTimeoutMs);
-                // console.log('validating proxy');
-                // console.log('get one valid proxy');
-                // console.log(12);
+
+                // todo: format ip to {protocol: '', address: '', port: ''}
+                let ip = this.poolMayBad.shift();
+
+                let goodIp = await ping(ip.protocol, ip.address, ip.port, this.validateProxyTimeoutMs);
+                // let goodIp = await this.ping(this.pingTarget, ip, this.validateProxyTimeoutMs);
+
+                // todo: save good proxy to db
                 this.pool.push(goodIp);
 
                 return resolve(true);
@@ -158,52 +130,16 @@ class Daili {
             catch (e) {
                 if (e.message === 'VALID_PROXY_ERROR') { }
                 if (e.message === 'VALID_PROXY_FAILED') { }
-                // do nothing
-                // console.log(e);
-                // return Bluebird.reject(e);
-                // console.log(13);
                 return resolve(false);
             }
-        }.bind(this));
+        });
 
 
     }
 
     getNewProxy(count, timeout) {
-        // console.log('gettting new proxy');
-        // console.log(this.poolMayBad.length, this.pool.length);
-        // console.log(14);
-        return new Bluebird(function (resolve, reject) {
-            request({
-                url: this.api + count,
-                encoding: null,  // body返回二进制数据
-                timeout: timeout
-            }, function (err, resp, body) {
-                // console.log(15);
-                if (err) {
-                    // console.log(16);
-                    return reject(new Error('GET_NEW_PROXY_ERROR'));
-                };
-
-                // console.log('got new proxy list');
-
-                body = Iconv.encode(Iconv.decode(body, 'gb2312'), 'utf8').toString();
-                // console.log(body);
-
-                if (resp.statusCode == 200 && /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(body)) {
-                    let tmpArr = body.trim().split(/\r\n/);
-                    // console.log(tmpArr);
-                    for (let i = 0; i < tmpArr.length; i++) {
-                        // console.log('add');
-                        this.poolMayBad.push(tmpArr[i]);
-                    }
-                    return resolve(tmpArr);
-                }
-
-                return reject(new Error('GET_NEW_PROXY_FAILED'));
-
-            }.bind(this));
-        }.bind(this));
+        // todo: need global timeout controll
+        return Bluebird.any(this._adapters);
     }
 
     reportBadIp(ip) {
