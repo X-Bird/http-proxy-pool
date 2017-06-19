@@ -139,7 +139,14 @@ class Daili {
 
     getNewProxy(count, timeout) {
         // todo: need global timeout controll
-        return Bluebird.any(this._adapters);
+        // return Bluebird.any(this._adapters);
+
+        
+        Bluebird.any().timeout(timeout).then(function (fileContents) {
+
+        }).catch(Promise.TimeoutError, function (e) {
+            console.log("could not read file within 100ms");
+        })
     }
 
     reportBadIp(ip) {
