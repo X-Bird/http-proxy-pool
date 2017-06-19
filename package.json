@@ -1,6 +1,6 @@
 {
   "name": "http-proxy-pool",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "maintain a proxy ip pool using express and request",
   "main": "index.js",
   "scripts": {
